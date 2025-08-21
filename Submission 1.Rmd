@@ -1,0 +1,117 @@
+---
+title: "Untitled"
+output:
+  pdf_document: default
+  html_document: default
+date: "`r Sys.Date()`"
+---
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+
+# 设置工作目录为数据所在位置
+setwd("/Users/charlottelv/Desktop/R")
+```
+
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+gene_expr <- read_csv("QBS103_GSE157103_genes.csv")
+metadata <- read_csv("QBS103_GSE157103_series_matrix-1.csv")
+```
+
+
+```{r}
+# Transpose gene expression data so that genes are columns and samples are rows
+gene_expr_t <- gene_expr %>%
+  column_to_rownames(var = colnames(gene_expr)[1]) %>%
+  t() %>%
+  as.data.frame() %>%
+  rownames_to_column("participant_id")
+
+# Extract age, sex, and ICU status from participant_id
+extract_info <- function(pid) {
+  parts <- str_match(pid, ".*_(\\d+)y_(male|female)_(ICU|NonICU)")
+  return(data.frame(
+    age = as.numeric(parts[,2]),
+    sex = parts[,3],
+    ICU_status = parts[,4]
+  ))
+}
+info <- extract_info(gene_expr_t$participant_id)
+gene_expr_t <- cbind(gene_expr_t, info)
+
+# Optionally join with metadata
+full_data <- left_join(gene_expr_t, metadata, by = "participant_id")
+
+# Select one gene (e.g., A1BG) and the covariates
+plot_df <- full_data %>%
+  select(
+    participant_id,
+    gene_expression = A1BG,
+    age = age.x,
+    sex = sex.x,
+    ICU_status
+  ) %>%
+  drop_na()
+print(plot_df)
+```
+
+
+```{r}
+ggplot(plot_df, aes(x = gene_expression)) +
+  geom_histogram(bins = 15, fill = "steelblue", color = "black") +
+  labs(
+    title = "Histogram of A1BG Expression",
+    x = "A1BG Expression",
+    y = "Count"
+  ) +
+  theme_minimal()
+
+```
+```{r}
+ggplot(plot_df, aes(x = age, y = gene_expression, color = sex, shape = ICU_status)) +
+  geom_point(size = 2.5, alpha = 0.8) +
+  labs(
+    title = "A1BG Expression vs Age",
+    x = "Age",
+    y = "A1BG Expression"
+  ) +
+  theme_minimal()
+```
+
+
+```{r}
+
+ggplot(plot_df, aes(x = sex, y = gene_expression, fill = ICU_status)) +
+  geom_boxplot() +
+  labs(
+    title = "Boxplot of A1BG Expression by Sex and ICU Status",
+    x = "Sex",
+    y = "A1BG Expression"
+  ) +
+  theme_minimal()
+
+```
+

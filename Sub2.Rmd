@@ -1,0 +1,90 @@
+---
+title: "Untitled"
+output:
+  pdf_document: default
+  html_document: default
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+setwd("/Users/charlottelv/Desktop/R")
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+gene_expr <- read_csv("QBS103_GSE157103_genes.csv")
+metadata <- read_csv("QBS103_GSE157103_series_matrix-1.csv")
+# ---- Standardize Column Names ----
+metadata <- metadata %>%
+  rename(icu = icu_status)
+```
+
+
+```{r}
+# ---- Reshape gene expression ---- <- 
+gene_expr_long <- gene_expr %>%
+  rename(Gene = `...1`) %>%
+  pivot_longer(-Gene, names_to = "participant_id", values_to = "expression") %>%
+  pivot_wider(names_from = Gene, values_from = expression)
+
+# ---- Merge with metadata ----
+full_data <- left_join(metadata, gene_expr_long, by = "participant_id")
+
+# ---- Define plotting function ----
+create_gene_plots <- function(df, genes, cont_cov, cat_cov1, cat_cov2) {
+  for (gene in genes) {
+    if (!(gene %in% colnames(df))) {
+      warning(paste("Gene", gene, "not found."))
+      next
+    }
+
+    plot_df <- df %>%
+      select(participant_id, gene_expression = all_of(gene),
+             cont = all_of(cont_cov),
+             cat1 = all_of(cat_cov1),
+             cat2 = all_of(cat_cov2)) %>%
+      drop_na()
+
+    # Histogram
+    p1 <- ggplot(plot_df, aes(x = gene_expression)) +
+      geom_histogram(bins = 30, fill = "skyblue", color = "black") +
+      labs(title = paste("Histogram of", gene), x = "Expression", y = "Count")
+    print(p1)
+
+    # Scatterplot
+    p2 <- ggplot(plot_df, aes(x = cont, y = gene_expression)) +
+      geom_point(aes(color = cat1), alpha = 0.7) +
+      labs(title = paste("Scatterplot of", gene, "vs", cont_cov),
+           x = cont_cov, y = "Expression")
+    print(p2)
+
+    # Boxplot
+    p3 <- ggplot(plot_df, aes(x = cat1, y = gene_expression, fill = cat2)) +
+      geom_boxplot() +
+      labs(title = paste("Boxplot of", gene, "by", cat_cov1, "and", cat_cov2),
+           x = cat_cov1, y = "Expression")
+    print(p3)
+  }
+}
+
+# ---- Run the function for selected genes ----
+selected_genes <- c("A1BG", "A2M", "A4GALT")
+create_gene_plots(full_data,
+                  genes = selected_genes,
+                  cont_cov = "age",
+                  cat_cov1 = "sex",
+                  cat_cov2 = "icu")
+
+红色 non icu
+```
+
+
+
